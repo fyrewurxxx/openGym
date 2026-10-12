@@ -28,6 +28,7 @@ import {
 } from '../lib/rotation.js'
 import { activeBlockDef, blockOf, blockWeekOf, stopBlock } from '../lib/program-block.js'
 import { startBlockSheet } from '../components/StartBlockSheet.jsx'
+import { blockEditorSheet } from '../components/BlockEditorSheet.jsx'
 
 // Plan has two views (v1.3.11): Schedule (how you train, and when) and Routines (what you
 // train). The last one you looked at comes back: a per-device convenience, never synced, so it
@@ -333,6 +334,12 @@ function Schedule({ S, update, nav, mode }) {
       </div>
     </div>}
 
+    {/* The definitions: made and edited here, started from "Program Block" above. */}
+    <Section className="plan-blocks" title={t('Program blocks')}>
+      {blocks.map(b => <Row key={b.id} icon="calendar" title={b.name} subtitle={t('Weeks: {0}', b.weeks)}
+        accessory="chevron" onClick={() => blockEditorSheet(b.id)} />)}
+      <Row icon="plus" title={t('New block')} onClick={() => blockEditorSheet()} />
+    </Section>
     {!S.routines.length && <div className="empty plan-empty">
       <div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Make one, or grab the starter plan to get going.')}
       <div style={{ marginTop: 12 }}><Button icon="clipboard" onClick={starterPlanSheet}>{t('Load starter plan')}</Button></div>

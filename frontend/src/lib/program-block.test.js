@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  blockWeekOf, blockPrescriptionFor, blockLabelOf, trainingMaxFrom1RM, trainingMaxesFrom,
+  blockWeekOf, blockRoutineIdsOn, blockPrescriptionFor, blockLabelOf, trainingMaxFrom1RM, trainingMaxesFrom,
   blockExerciseIds, startBlock, stopBlock,
+  newBlockDraft, blockSlotCandidates, normalizeBlock, blockProblem, saveBlock, deleteBlock, DEFAULT_WEEK,
 } from './program-block.js'
 
 // A 3-week block starting Mon 2026-03-02, one slot (exercise '0025') with a different percentage each week.
@@ -148,5 +149,95 @@ describe('startBlock / stopBlock', () => {
     const s = { programBlocks: [], activeBlock: null }
     startBlock(s, 'b', { a: 90 }, '2026-03-02')
     expect(s.activeBlock).toEqual({ blockId: 'b', startsOn: '2026-03-02', tm: { a: 90 } })
+  })
+})
+
+describe('block definitions', () => {
+  const S = () => ({
+    unit: 'kg',
+    routines: [
+      { id: 'a', name: 'A', ex: [{ id: '0025' }, { id: '0032' }, { id: 'plank', mode: 'time' }] },
+      { id: 'b', name: 'B', ex: [{ id: '0032' }, { id: '0041' }] },
+      { id: 'c', name: 'C', ex: [{ id: '0099' }] },
+    ],
+    programBlocks: [], activeBlock: null,
+  })
+  const draft = (over = {}) => ({
+    ...newBlockDraft('b1'), name: 'Operator', daysPerWeek: 2, weeks: 3, days: { 1: 'a', 4: 'b' },
+    table: { '0025': { 1: { pct: 80, sets: 3, reps: 5 } } }, ...over,
+  })
+
+  it('offers each exercise of the assigned routines once, flags timed ones, ignores unassigned routines', () => {
+    expect(blockSlotCandidates(S(), draft())).toEqual([
+      { id: '0025', timed: false }, { id: '0032', timed: false }, { id: 'plank', timed: true }, { id: '0041', timed: false },
+    ])
+  })
+
+  it('keeps a table slot whose routine was unassigned so it can still be taken out', () => {
+    const c = blockSlotCandidates(S(), draft({ days: { 1: 'b' }, table: { '0025': {} } }))
+    expect(c.map(x => x.id)).toEqual(['0032', '0041', '0025'])
+  })
+
+  it('normalizes: trims, fills untouched weeks with the default, drops weeks past the duration', () => {
+    const b = normalizeBlock(draft({ name: '  Operator ', weeks: 2, table: { '0025': { 1: { pct: 85, sets: 2, reps: 3, exerciseId: '0041' }, 3: { pct: 99, sets: 1, reps: 1 } } } }))
+    expect(b.name).toBe('Operator')
+    expect(b.table['0025']).toEqual({
+      1: { pct: 85, sets: 2, reps: 3, exerciseId: '0041' },
+      2: { ...DEFAULT_WEEK },
+    })
+  })
+
+  it('refuses a save that has no name, no weeks or the wrong number of days', () => {
+    expect(blockProblem(S(), draft({ name: ' ' }))).toEqual({ code: 'name' })
+    expect(blockProblem(S(), draft({ weeks: 0 }))).toEqual({ code: 'weeks' })
+    expect(blockProblem(S(), draft({ weeks: 53 }))).toEqual({ code: 'weeks' })
+    expect(blockProblem(S(), draft({ daysPerWeek: 3 }))).toEqual({ code: 'days' })
+    expect(blockProblem(S(), draft())).toBe(null)
+  })
+
+  it('refuses a timed exercise in the table, as a slot or as a week override', () => {
+    expect(blockProblem(S(), draft({ table: { plank: { 1: { pct: 70, sets: 3, reps: 5 } } } }))).toEqual({ code: 'timed', id: 'plank' })
+    expect(blockProblem(S(), draft({ table: { '0025': { 2: { pct: 70, sets: 3, reps: 5, exerciseId: 'plank' } } } }))).toEqual({ code: 'timed', id: 'plank' })
+  })
+
+  it('refuses a chain that points at the block itself', () => {
+    expect(blockProblem(S(), draft({ nextBlockId: 'b1' }))).toEqual({ code: 'chain' })
+    expect(blockProblem(S(), draft({ nextBlockId: 'b2' }))).toBe(null)
+  })
+
+  it('saves new, then replaces by id; a refused save writes nothing', () => {
+    const s = S()
+    expect(saveBlock(s, draft())).toBe(null)
+    expect(s.programBlocks).toHaveLength(1)
+    expect(saveBlock(s, draft({ name: 'Renamed' }))).toBe(null)
+    expect(s.programBlocks).toHaveLength(1)
+    expect(s.programBlocks[0].name).toBe('Renamed')
+    expect(saveBlock(s, draft({ name: '' }))).toEqual({ code: 'name' })
+    expect(s.programBlocks[0].name).toBe('Renamed')
+  })
+
+  it('editing a running block keeps its start date and maxes, and a new slot has no max', () => {
+    const s = S()
+    saveBlock(s, draft())
+    startBlock(s, 'b1', { '0025': 90 }, '2026-03-02')
+    saveBlock(s, draft({ weeks: 5, table: { '0025': { 1: { pct: 80, sets: 3, reps: 5 } }, '0041': {} } }))
+    expect(s.activeBlock).toEqual({ blockId: 'b1', startsOn: '2026-03-02', tm: { '0025': 90 } })
+    expect(s.programBlocks[0].weeks).toBe(5)
+    // '0041' is in the table but was never given a max: normal progression, never a weight of 0.
+    expect(blockPrescriptionFor(s, { id: '0041' }, '2026-03-02')).toBe(null)
+    expect(blockPrescriptionFor(s, { id: '0025' }, '2026-03-02').weight).toBe(72.5)
+  })
+
+  it('deleting clears chains into it and leaves a running instance reading as rest', () => {
+    const s = S()
+    saveBlock(s, draft({ id: 'b2', name: 'Next' }))
+    saveBlock(s, draft({ nextBlockId: 'b2' }))
+    startBlock(s, 'b1', {}, '2026-03-02')
+    deleteBlock(s, 'b2')
+    expect(s.programBlocks.find(b => b.id === 'b1').nextBlockId).toBe(null)
+    deleteBlock(s, 'b1')
+    expect(s.programBlocks).toEqual([])
+    expect(s.activeBlock).not.toBe(null)
+    expect(blockRoutineIdsOn(s, '2026-03-02')).toEqual([])
   })
 })

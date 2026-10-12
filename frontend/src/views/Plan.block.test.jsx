@@ -167,3 +167,13 @@ describe('Plan — a running block', () => {
     expect(mocks.S.activeBlock).toEqual(before)
   })
 })
+
+describe('Plan — block definitions', () => {
+  it('lists the saved blocks and opens the editor for one, or a new one', () => {
+    mount()
+    const sec = host.querySelector('.plan-blocks')
+    expect(sec.textContent).toContain('Operator')
+    click([...sec.querySelectorAll('.row, [role=button], button')].find(el => el.textContent.includes('New block')))
+    expect(useUI.getState().sheets).toHaveLength(1)
+  })
+})

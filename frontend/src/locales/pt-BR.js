@@ -1405,6 +1405,19 @@ export const PT_BR_OVERRIDES = {
   'Releases are checked on GitHub. The download is verified against its checksum before the installer opens.': 'As versões são verificadas no GitHub. O download é conferido pela soma de verificação antes de abrir o instalador.',
   'Set a Training Max for each lift. A lift left blank keeps its normal progression.': 'Defina um Training Max para cada exercício. Um exercício deixado em branco segue a progressão normal.',
   'The block sets your days and weights until it ends or you stop it.': 'O bloco define seus dias e cargas até terminar ou você pará-lo.',
+  'A block can’t chain into itself.': 'Um bloco não pode se encadear a si mesmo.',
+  'Delete block': 'Excluir bloco',
+  'Delete {0}?': 'Excluir {0}?',
+  'Give a routine to exactly {0} days, or change the days per week.': 'Atribua uma rotina a exatamente {0} dias ou altere os dias por semana.',
+  'Give the block a name.': 'Dê um nome ao bloco.',
+  'Give the days a routine and its lifts show up here.': 'Atribua uma rotina aos dias e os exercícios dela aparecem aqui.',
+  'It is running now. Your days go back to rest until you stop it.': 'Está em andamento. Seus dias voltam a ser de descanso até você pará-lo.',
+  'Keeps its own progression': 'Segue a própria progressão',
+  'Pick the routine this block trains on this day.': 'Escolha a rotina que este bloco treina neste dia.',
+  'Put {0} in the table': 'Colocar {0} na tabela',
+  'This block is running. Changes apply from the next day; a lift added now keeps its own progression until the block ends.': 'Este bloco está em andamento. As alterações valem a partir do dia seguinte; um exercício adicionado agora segue a própria progressão até o bloco terminar.',
+  'Timed, so a block can’t hold it': 'Por tempo, então um bloco não pode contê-lo',
+  'Your logged sessions keep their history.': 'Suas sessões registradas mantêm o histórico.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

@@ -7,6 +7,7 @@
 // The week number is never stored: it is derived from the date and `startsOn` every time.
 
 import { snapWeight, weightIncrement } from './progression.js'
+import { modeOf } from './history.js'
 import { blockWeekOf, blockOf, activeBlockDef, blockRoutineIdsOn } from './block-calendar.js'
 
 export { blockWeekOf, blockOf, activeBlockDef, blockRoutineIdsOn }
@@ -93,4 +94,117 @@ export function startBlock(s, blockId, tm, startsOn) {
  */
 export function stopBlock(s) {
   s.activeBlock = null
+}
+
+// ---- Definitions: the block editor's pure half (docs/dev/PROGRAM_BLOCKS.md §1.1, §7.3, §8) ----
+
+/** What a week of a freshly added slot starts at, and what a week the editor never touched saves as. */
+export const DEFAULT_WEEK = { pct: 70, sets: 3, reps: 5 }
+export const MAX_BLOCK_WEEKS = 52
+
+export const newBlockDraft = id => ({
+  id, name: '', daysPerWeek: 3, weeks: 4, days: {}, table: {}, nextBlockId: null,
+})
+
+/**
+ * The exercises a block's table can be built over: those of the routines its days assign, once
+ * each in routine order, plus any slot the table already holds whose routine has since changed (so
+ * it can still be seen and taken out). `timed` marks the ones a table cannot take.
+ */
+export function blockSlotCandidates(S, block) {
+  const routines = S?.routines || []
+  const assigned = new Set(Object.values(block?.days || {}).filter(Boolean))
+  const cfgs = new Map()
+  for (const r of routines) {
+    if (!assigned.has(r.id)) continue
+    for (const e of r.ex || []) if (e?.id && !cfgs.has(e.id)) cfgs.set(e.id, e)
+  }
+  for (const id of Object.keys(block?.table || {})) {
+    if (cfgs.has(id)) continue
+    const cfg = routines.flatMap(r => r.ex || []).find(e => e?.id === id)
+    cfgs.set(id, cfg || { id })
+  }
+  return [...cfgs.values()].map(cfg => ({ id: cfg.id, timed: modeOf(cfg) === 'time' }))
+}
+
+/**
+ * A definition as it is stored: trimmed name, whole numbers, and every table slot holding exactly
+ * weeks 1..weeks. A week the editor never touched is stored as DEFAULT_WEEK (what it showed), and
+ * weeks past a shortened duration are dropped. Never mutates its argument.
+ */
+export function normalizeBlock(block) {
+  const weeks = Math.round(Number(block.weeks)) || 0
+  const table = {}
+  for (const [slot, perWeek] of Object.entries(block.table || {})) {
+    table[slot] = {}
+    for (let w = 1; w <= weeks; w++) {
+      const e = perWeek?.[w] || {}
+      const entry = {
+        pct: e.pct > 0 ? e.pct : DEFAULT_WEEK.pct,
+        sets: e.sets > 0 ? Math.round(e.sets) : DEFAULT_WEEK.sets,
+        reps: e.reps > 0 ? Math.round(e.reps) : DEFAULT_WEEK.reps,
+      }
+      if (e.exerciseId) entry.exerciseId = e.exerciseId
+      table[slot][w] = entry
+    }
+  }
+  return {
+    id: block.id,
+    name: String(block.name || '').trim(),
+    daysPerWeek: Math.round(Number(block.daysPerWeek)) || 0,
+    weeks,
+    days: Object.fromEntries(Object.entries(block.days || {}).filter(([, id]) => id)),
+    table,
+    nextBlockId: block.nextBlockId || null,
+  }
+}
+
+/**
+ * Why a definition cannot be saved, as { code } (with `id` for 'timed'), or null when it can:
+ *   name   — empty
+ *   weeks  — not a whole number of weeks, 1..MAX_BLOCK_WEEKS
+ *   days   — daysPerWeek is not 1..7, or the weekdays given a routine are not that many
+ *   timed  — a timed exercise sits in the table (a slot, or a week's override): a block's
+ *            percentages are of a Training Max, which a hold does not have (§1.1)
+ *   chain  — the chain target is the block itself
+ */
+export function blockProblem(S, block) {
+  const b = normalizeBlock(block)
+  if (!b.name) return { code: 'name' }
+  if (!(b.weeks >= 1 && b.weeks <= MAX_BLOCK_WEEKS)) return { code: 'weeks' }
+  if (!(b.daysPerWeek >= 1 && b.daysPerWeek <= 7) || Object.keys(b.days).length !== b.daysPerWeek) return { code: 'days' }
+  const cfgOf = id => (S?.routines || []).flatMap(r => r.ex || []).find(e => e?.id === id) || { id }
+  for (const [slot, perWeek] of Object.entries(b.table)) {
+    const timed = [slot, ...Object.values(perWeek).map(e => e.exerciseId)].find(id => id && modeOf(cfgOf(id)) === 'time')
+    if (timed) return { code: 'timed', id: timed }
+  }
+  if (b.nextBlockId && b.nextBlockId === b.id) return { code: 'chain' }
+  return null
+}
+
+/**
+ * Saves a definition (new, or replacing the one with its id), normalized. Returns the problem and
+ * writes nothing when it cannot be saved. S.activeBlock is never touched: a running block reads
+ * the new definition from the next day on, past stamps are frozen (§8), and an exercise added to
+ * the table mid-run has no captured Training Max, so it keeps its own progression until the block
+ * ends (blockPrescriptionFor).
+ */
+export function saveBlock(s, block) {
+  const problem = blockProblem(s, block)
+  if (problem) return problem
+  const next = normalizeBlock(block)
+  if (!s.programBlocks) s.programBlocks = []
+  const at = s.programBlocks.findIndex(b => b.id === next.id)
+  if (at < 0) s.programBlocks.push(next); else s.programBlocks[at] = next
+  return null
+}
+
+/**
+ * Removes a definition. A chain that pointed at it is cleared (the block before it simply ends).
+ * A running instance is left as it is: activeBlockDef reads null, the schedule reads rest, and
+ * Stop block still works (§8).
+ */
+export function deleteBlock(s, id) {
+  s.programBlocks = (s.programBlocks || []).filter(b => b.id !== id)
+  for (const b of s.programBlocks) if (b.nextBlockId === id) b.nextBlockId = null
 }

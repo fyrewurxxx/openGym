@@ -2355,7 +2355,31 @@ function DayAssign({ day, close }) {
     <Button variant="primary" onClick={close}>{t('Done')}</Button>
   </>
 }
-export const dayAssignSheet = day => ui().openSheet(close => <DayAssign day={day} close={close} />)
+// The same weekday, picked for a Program Block's own mapping (docs/dev/PROGRAM_BLOCKS.md §7.3):
+// one routine or a rest day, never S.week. The block editor holds the draft, so the pick goes back
+// through scope.onPick(routineId | null) and the sheet closes on it; a block day has no combined form.
+function BlockDayAssign({ day, scope, close }) {
+  const st = useStore(s => s.S)
+  const pick = id => { scope.onPick(id); close() }
+  return <>
+    <h3 style={{ marginBottom: 2 }}>{t(DAYN[day])}</h3>
+    <div className="muted small" style={{ marginBottom: 10 }}>{t('Pick the routine this block trains on this day.')}</div>
+    <div className="list menu-list">
+      <div className="item menu-item" {...tappable(() => pick(null))}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="moon" /></span><div className="grow"><div className="tt">{t('Rest day')}</div></div><span className={'menu-on' + (!scope.current ? ' is-on' : '')}><Icon name="check" /></span></div>
+      {st.routines.map(r => {
+        const on = scope.current === r.id
+        return <div key={r.id} className="item menu-item" aria-pressed={on} {...tappable(() => pick(r.id))}>
+          <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+          <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+          <span className={'menu-on' + (on ? ' is-on' : '')}><Icon name="check" /></span>
+        </div>
+      })}
+    </div>
+  </>
+}
+export const dayAssignSheet = (day, scope) => ui().openSheet(close => scope
+  ? <BlockDayAssign day={day} scope={scope} close={close} />
+  : <DayAssign day={day} close={close} />)
 
 /* ============================ workout detail ============================ */
 // Correcting when a saved session happened: typed in from another app, or logged on the wrong
