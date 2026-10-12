@@ -47,3 +47,50 @@ export function blockLabelOf(S, workout) {
   const block = stamped ? blockOf(S, stamped.blockId) : null
   return block ? { name: block.name, week: stamped.blockWeek, weeks: block.weeks } : null
 }
+
+// A 1RM entered at Start is stored as the Training Max: a fixed 90% of it, to a tenth.
+export const TM_FRACTION = 0.9
+export const trainingMaxFrom1RM = oneRM => Math.round(oneRM * TM_FRACTION * 10) / 10
+
+/**
+ * Every exercise a block can ever need a Training Max for: each table slot and each week's
+ * override exercise, first occurrence order. The Start sheet asks for all of them upfront, so an
+ * exercise reached only in week 12 is not a surprise prompt in week 12.
+ */
+export function blockExerciseIds(block) {
+  const ids = []
+  const add = id => { if (id && !ids.includes(id)) ids.push(id) }
+  for (const [slot, weeks] of Object.entries(block?.table || {})) {
+    add(slot)
+    for (const entry of Object.values(weeks || {})) add(entry?.exerciseId)
+  }
+  return ids
+}
+
+/**
+ * The `tm` map for a running block from the Start sheet's rows ({ id, mode: '1rm' | 'tm', value }).
+ * A blank or non-positive row is left out: that lift keeps its normal progression, never a
+ * weight of 0 (blockPrescriptionFor).
+ */
+export function trainingMaxesFrom(rows) {
+  const tm = {}
+  for (const { id, mode, value } of rows) {
+    const n = Number(value)
+    if (!(n > 0)) continue
+    tm[id] = mode === '1rm' ? trainingMaxFrom1RM(n) : n
+  }
+  return tm
+}
+
+/** Starts a block on `startsOn` with its captured Training Maxes. Week and rotation stay untouched. */
+export function startBlock(s, blockId, tm, startsOn) {
+  s.activeBlock = { blockId, startsOn, tm }
+}
+
+/**
+ * Stops the running block now. Always leaves the Block Chain (nextBlockId is never consulted) and
+ * reverts to the week/rotation exactly as they were; sessions already logged keep their stamp.
+ */
+export function stopBlock(s) {
+  s.activeBlock = null
+}

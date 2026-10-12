@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { blockWeekOf, blockPrescriptionFor, blockLabelOf } from './program-block.js'
+import {
+  blockWeekOf, blockPrescriptionFor, blockLabelOf, trainingMaxFrom1RM, trainingMaxesFrom,
+  blockExerciseIds, startBlock, stopBlock,
+} from './program-block.js'
 
 // A 3-week block starting Mon 2026-03-02, one slot (exercise '0025') with a different percentage each week.
 const blockState = (over = {}) => ({
@@ -100,5 +103,50 @@ describe('blockLabelOf', () => {
   it('says nothing for a session with no stamp, or whose block definition was deleted', () => {
     expect(blockLabelOf(blockState(), { entries: [{ id: '0025' }] })).toBeNull()
     expect(blockLabelOf(blockState({ programBlocks: [] }), workout)).toBeNull()
+  })
+})
+
+describe('Training Max capture', () => {
+  it('stores 90% of a 1RM to a tenth, and a Training Max as entered', () => {
+    expect(trainingMaxFrom1RM(100)).toBe(90)
+    expect(trainingMaxFrom1RM(142.5)).toBe(128.3)
+    expect(trainingMaxesFrom([
+      { id: 'a', mode: '1rm', value: 100 },
+      { id: 'b', mode: 'tm', value: 87.5 },
+    ])).toEqual({ a: 90, b: 87.5 })
+  })
+
+  it('leaves out a blank or non-positive row', () => {
+    expect(trainingMaxesFrom([
+      { id: 'a', mode: 'tm', value: '' },
+      { id: 'b', mode: '1rm', value: 0 },
+      { id: 'c', mode: 'tm', value: 60 },
+    ])).toEqual({ c: 60 })
+  })
+
+  it('lists table slots and override exercises once each, override-only ones included', () => {
+    const block = { table: {
+      '0025': { 1: { pct: 70 }, 5: { pct: 80, exerciseId: 'dl' } },
+      '0032': { 1: { pct: 70 }, 6: { pct: 80, exerciseId: 'dl' } },
+    } }
+    expect(blockExerciseIds(block)).toEqual(['0025', 'dl', '0032'])
+    expect(blockExerciseIds(null)).toEqual([])
+  })
+})
+
+describe('startBlock / stopBlock', () => {
+  it('stop clears the running block whatever its chain target, keeping the week and rotation', () => {
+    const s = { ...blockState(), week: { 1: ['r'] }, rotation: { id: 'x' } }
+    s.programBlocks[0].nextBlockId = 'b2'
+    stopBlock(s)
+    expect(s.activeBlock).toBe(null)
+    expect(s.week).toEqual({ 1: ['r'] })
+    expect(s.rotation).toEqual({ id: 'x' })
+  })
+
+  it('start writes the block, its start date and the captured maxes', () => {
+    const s = { programBlocks: [], activeBlock: null }
+    startBlock(s, 'b', { a: 90 }, '2026-03-02')
+    expect(s.activeBlock).toEqual({ blockId: 'b', startsOn: '2026-03-02', tm: { a: 90 } })
   })
 })

@@ -10,6 +10,7 @@ import Icon from '../components/Icon.jsx'
 import QueueRow from '../components/QueueRow.jsx'
 import { queueOf, queueView, weekTally, pinState } from '../lib/queue.js'
 import { scheduleModeOf } from '../lib/rotation.js'
+import { activeBlockDef, blockWeekOf } from '../lib/program-block.js'
 import { useConnectionTrouble } from '../components/SyncBanner.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
@@ -77,6 +78,9 @@ export default function Home() {
   // an empty-state card takes its place. Plan does the same in rotation mode: no weekday grid, only
   // the days that add a routine the loop does not have (Plan.jsx, "Also on fixed days").
   const rotating = scheduleModeOf(S) === 'rotation'
+  // "{block} · Week N of M" under Today while a Program Block runs (and its run is not over).
+  const blockDef = scheduleModeOf(S) === 'block' ? activeBlockDef(S) : null
+  const blockWeek = blockDef ? blockWeekOf(blockDef, S.activeBlock, todayISO()) : null
   // A planner-written queue (no rotationId) still names its weekday when it hasn't started yet —
   // that copy predates rotation and stays as it is. Our own rotation has no weekday of its own
   // (lib/rotation.js): naming one here — including on the pass's own one-day empty gap (THE
@@ -137,6 +141,7 @@ export default function Home() {
             <div className="ttl">{S.active ? (editingSaved ? S.active.name : t('{0} (in progress)', S.active.name))
               : doneToday ? (doneToday.name ? t('{0} (done)', doneToday.name) : t('Workout done'))
               : routine ? todayName : t('Rest day')}{todayOvr && routine && !doneToday ? ' · ' + t('rescheduled') : ''}</div>
+            {blockWeek != null && <div className="ss">{t('{0} · Week {1} of {2}', blockDef.name, blockWeek, blockDef.weeks)}</div>}
             {next && !doneToday && <div className="ss">{t('Next session: {0}, {1}', t(DAYN[next.weekday]), next.routine.name)}</div>}
           </div>
         </div>

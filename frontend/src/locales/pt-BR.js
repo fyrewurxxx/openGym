@@ -1403,6 +1403,8 @@ export const PT_BR_OVERRIDES = {
   'Gentle, for headphones or a quiet room.': 'Suave, para fones de ouvido ou um lugar silencioso.',
   'Fewer than two workouts in this period. Pick a longer one.': 'Menos de dois treinos neste período. Escolha um mais longo.',
   'Releases are checked on GitHub. The download is verified against its checksum before the installer opens.': 'As versões são verificadas no GitHub. O download é conferido pela soma de verificação antes de abrir o instalador.',
+  'Set a Training Max for each lift. A lift left blank keeps its normal progression.': 'Defina um Training Max para cada exercício. Um exercício deixado em branco segue a progressão normal.',
+  'The block sets your days and weights until it ends or you stop it.': 'O bloco define seus dias e cargas até terminar ou você pará-lo.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }
