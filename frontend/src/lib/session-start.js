@@ -9,6 +9,8 @@ import { nextPrescription, applyPrescription, defaultIncrement, weightIncrement,
 import { dropGrid } from './plates.js'
 import { backoffStepOf, applyBackoff } from './backoff.js'
 import { dbLoadFor, historyAs, ownedWeightsFor } from './dumbbells.js'
+import { blockPrescriptionFor } from './program-block.js'
+import { sessionDateOf } from './backfill.js'
 
 /**
  * Where a planned session's reps come from (Settings → During a workout). 'plan', the default:
@@ -26,15 +28,17 @@ export const startsFromLast = st => st?.startFrom === 'last'
  * so an entry cannot come out differently depending on where it was made. `routine` is the one
  * the exercise is planned in: its own history comes first (#216) and its policy applies.
  * `noProg` builds the routine's own numbers with no prescription, as an excluded routine does.
+ * `blockPlan` is a Program Block's prescription for this exercise (program-block.js); it takes
+ * the place of the progression policy's.
  */
-export function buildPlannedEntry(stored, cfg, routine, { noProg = false } = {}) {
+export function buildPlannedEntry(stored, cfg, routine, { noProg = false, blockPlan = null } = {}) {
   // What a dumbbell weight means for this exercise today (lib/dumbbells.js): the history it
   // progresses from is read in that meaning, so a switch from "40 total" to per bell opens at
   // 20, not at 40 a hand. Only a switch between the two explicit meanings converts anything.
   const meaning = dbLoadFor(stored, cfg)
   const st = historyAs(stored, cfg.id, meaning)
   // `plan` is kept on the entry purely so the workout can explain the number it chose.
-  const plan = noProg ? { policy: 'off', kind: 'off' } : nextPrescription(st, cfg, routine)
+  const plan = noProg ? { policy: 'off', kind: 'off' } : blockPlan ?? nextPrescription(st, cfg, routine)
   // The warm-up ramp and the prescription snap to the exercise's own increment (1.25 kg
   // plates exist), not the unit default; a timed exercise's `inc` is seconds, so it keeps the
   // default for its optional load.
@@ -119,8 +123,15 @@ export function buildSessionEntries(st, r) {
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards.
   const noProg = r?.excludeFromProgression === true
-  return (r ? r.ex : []).map(cfg => {
-    const built = buildPlannedEntry(st, cfg, r, { noProg })
+  // A running block prescribes the exercises its table lists, for the day this session is built
+  // for (a backfilled or edited session reads its own day, not today).
+  const date = sessionDateOf(st)
+  return (r ? r.ex : []).map(slot => {
+    const blockPlan = noProg ? null : blockPrescriptionFor(st, slot, date)
+    // A week can name another exercise for the slot: it is built exactly like a freshly
+    // swapped-in one, with the slot's own settings (sets, warm-ups, intensifiers) riding along.
+    const cfg = blockPlan && blockPlan.exerciseId !== slot.id ? { ...slot, id: blockPlan.exerciseId } : slot
+    const built = buildPlannedEntry(st, cfg, r, { noProg, blockPlan })
     return { id: cfg.id, sg: cfg.sg, ...built, ...(noProg ? { noProg: true } : {}) }
   })
 }

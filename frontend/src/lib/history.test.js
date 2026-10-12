@@ -1387,6 +1387,41 @@ describe('effectiveRoutineIds / effectiveRoutines', () => {
   })
 })
 
+// ---- a running Program Block supersedes the week, the rotation and any per-day override ----
+describe('effectiveRoutineIds — program block', () => {
+  const routines = [{ id: 'r1', name: 'Week', ex: [{ id: '1' }] }, { id: 'r2', name: 'Block', ex: [{ id: '2' }] }]
+  const ISO = '2026-08-19'                       // a Wednesday → getDay() 3, week 1 of the block
+  const S = (over = {}) => ({
+    routines,
+    // everything the old schedule could say, all disagreeing with the block
+    week: { 3: 'r1', 4: 'r1' }, dayPlan: { [ISO]: 'r1' }, scheduleMode: 'rotation',
+    rotation: { id: 'rot', sequence: ['r1'], label: 'Rot' },
+    programBlocks: [{ id: 'b', name: 'Base', weeks: 2, days: { 3: 'r2' }, table: {} }],
+    activeBlock: { blockId: 'b', startsOn: '2026-08-17', tm: {} },
+    ...over,
+  })
+
+  it('trains the routine the block assigns, ignoring the week, the rotation and a day override', () => {
+    expect(effectiveRoutineIds(S(), ISO)).toEqual(['r2'])
+  })
+  it('is a rest day on a weekday the block does not assign, even if the week has a routine there', () => {
+    expect(effectiveRoutineIds(S(), '2026-08-20')).toEqual([])   // Thursday: S.week says r1
+  })
+  it('is rest once the block run is over', () => {
+    expect(effectiveRoutineIds(S(), '2026-09-02')).toEqual([])   // week 3 of a 2-week block
+  })
+  it('is rest, not an error, when the block definition was deleted', () => {
+    expect(effectiveRoutineIds(S({ programBlocks: [] }), ISO)).toEqual([])
+  })
+  it('is rest when the assigned routine no longer exists', () => {
+    const blocks = [{ id: 'b', name: 'Base', weeks: 2, days: { 3: 'gone' }, table: {} }]
+    expect(effectiveRoutineIds(S({ programBlocks: blocks }), ISO)).toEqual([])
+  })
+  it('a backfilled date resolves nothing before the block started', () => {
+    expect(effectiveRoutineIds(S(), '2026-08-12')).toEqual([])   // the Wednesday before startsOn
+  })
+})
+
 // ---- coach queue: the week's sessions in order, the first undone one is today's (lib/queue.js) ----
 describe('effectiveRoutineIds — coach queue', () => {
   const routines = [

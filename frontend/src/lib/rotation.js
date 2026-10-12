@@ -27,8 +27,12 @@ import { queueOf, queueView } from './queue.js'
 const routineIdsOf = w => (Array.isArray(w?.routineIds) ? w.routineIds : (w?.routineId ? [w.routineId] : []))
 const dayAfter = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + 1); return isoOf(d) }
 
-/** 'rotation' while a usable live queue exists, or once chosen with nothing built yet (S.scheduleMode). */
-export const scheduleModeOf = S => (queueOf(S) || S?.scheduleMode === 'rotation') ? 'rotation' : 'week'
+/**
+ * 'block' while a Program Block runs (it supersedes the other two, lib/program-block.js);
+ * 'rotation' while a usable live queue exists, or once chosen with nothing built yet (S.scheduleMode).
+ */
+export const scheduleModeOf = S => S?.activeBlock ? 'block'
+  : (queueOf(S) || S?.scheduleMode === 'rotation') ? 'rotation' : 'week'
 
 /** A queue payload arrived but is unusable (malformed, duplicate-only, all-deleted): Week + a fix-up in Plan. */
 export const queueRecovery = S => S?.queue != null && !queueOf(S)
