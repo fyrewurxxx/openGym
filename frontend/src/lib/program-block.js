@@ -35,3 +35,15 @@ export function blockPrescriptionFor(S, cfg, iso) {
     why: ['{0} · Week {1} of {2}: {3}% of {4} {5} Training Max.', block.name, week, block.weeks, entry.pct, tm, unit],
   }
 }
+
+/**
+ * The block a saved session was built under, for the label History and the workout detail show:
+ * { name, week, weeks }, or null when no entry carries the stamp or the definition is gone (the
+ * logged sets are unaffected either way). The week is the stamped one, frozen at build time;
+ * only the name and length are read from the definition as it is now.
+ */
+export function blockLabelOf(S, workout) {
+  const stamped = (workout?.entries || []).find(e => e?.blockId && e.blockWeek > 0)
+  const block = stamped ? blockOf(S, stamped.blockId) : null
+  return block ? { name: block.name, week: stamped.blockWeek, weeks: block.weeks } : null
+}

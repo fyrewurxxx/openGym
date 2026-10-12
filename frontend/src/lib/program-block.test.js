@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { blockWeekOf, blockPrescriptionFor } from './program-block.js'
+import { blockWeekOf, blockPrescriptionFor, blockLabelOf } from './program-block.js'
 
 // A 3-week block starting Mon 2026-03-02, one slot (exercise '0025') with a different percentage each week.
 const blockState = (over = {}) => ({
@@ -83,5 +83,22 @@ describe('blockPrescriptionFor', () => {
     const S = blockState()
     S.programBlocks[0].table['0025'][3] = { pct: 50, sets: 5, reps: 3, exerciseId: '0099' }
     expect(blockPrescriptionFor(S, { id: '0025', inc: 2.5 }, '2026-03-17')).toBe(null)
+  })
+})
+
+describe('blockLabelOf', () => {
+  const workout = { entries: [{ id: '0001' }, { id: '0025', blockId: 'b', blockWeek: 2 }] }
+
+  it('names the block and the stamped week of a session built under it', () => {
+    expect(blockLabelOf(blockState(), workout)).toEqual({ name: 'Base Building', week: 2, weeks: 3 })
+  })
+
+  it('reads the stamped week even once the block is no longer the active one', () => {
+    expect(blockLabelOf(blockState({ activeBlock: null }), workout)).toMatchObject({ week: 2 })
+  })
+
+  it('says nothing for a session with no stamp, or whose block definition was deleted', () => {
+    expect(blockLabelOf(blockState(), { entries: [{ id: '0025' }] })).toBeNull()
+    expect(blockLabelOf(blockState({ programBlocks: [] }), workout)).toBeNull()
   })
 })

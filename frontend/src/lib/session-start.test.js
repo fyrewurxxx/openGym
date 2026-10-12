@@ -231,6 +231,22 @@ describe('buildSessionEntries — program block', () => {
     expect(work.every(s => s.w === 82.5 && s.r === 4)).toBe(true)   // 80% of 102 = 81.6 → 82.5
   })
 
+  it('stamps the block and week on a block-owned entry, and nothing on one built from its policy', () => {
+    const r = { id: 'r', prog: 'linear', ex: [squat, { ...squat, id: '0001' }] }   // 0001 is not in the table
+    const [owned, free] = buildSessionEntries(blockSt({ asOf: '2026-03-09' }), r)   // week 2
+    expect(owned).toMatchObject({ blockId: 'b', blockWeek: 2 })
+    expect('blockId' in free).toBe(false)
+    expect('blockWeek' in free).toBe(false)
+  })
+
+  it('freezes the week it was built for, not the one a later edit of the definition would give', () => {
+    const [e] = buildSessionEntries(blockSt({ asOf: '2026-03-09' }), routine)
+    const edited = blockSt({ asOf: '2026-03-09' })
+    edited.programBlocks[0].weeks = 10
+    expect(e.blockWeek).toBe(2)
+    expect(buildSessionEntries(edited, routine)[0].blockWeek).toBe(2)   // derived from the date, so it is the same either way
+  })
+
   it('builds the override exercise in the slot, at its own Training Max, with the slot settings carried over', () => {
     const st = blockSt({ asOf: '2026-03-16' })   // week 3
     st.programBlocks[0].table['0025'][3] = { pct: 50, sets: 5, reps: 3, exerciseId: '0099' }

@@ -132,6 +132,9 @@ export function buildSessionEntries(st, r) {
     // swapped-in one, with the slot's own settings (sets, warm-ups, intensifiers) riding along.
     const cfg = blockPlan && blockPlan.exerciseId !== slot.id ? { ...slot, id: blockPlan.exerciseId } : slot
     const built = buildPlannedEntry(st, cfg, r, { noProg, blockPlan })
-    return { id: cfg.id, sg: cfg.sg, ...built, ...(noProg ? { noProg: true } : {}) }
+    // Frozen onto the entry as it is built, like `rid`: a later edit of the block's definition
+    // never moves a logged session to another week.
+    const stamp = blockPlan ? { blockId: blockPlan.blockId, blockWeek: blockPlan.week } : {}
+    return { id: cfg.id, sg: cfg.sg, ...built, ...stamp, ...(noProg ? { noProg: true } : {}) }
   })
 }

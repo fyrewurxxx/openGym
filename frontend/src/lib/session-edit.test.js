@@ -38,6 +38,15 @@ describe('saved workout editing', () => {
     expect(saved.entries[1]).not.toHaveProperty('plan')
   })
 
+  it('keeps the block stamp of a saved session through an edit', () => {
+    const state = fixture()
+    state.workouts[0].entries[0] = { ...state.workouts[0].entries[0], blockId: 'b', blockWeek: 2 }
+    editCompletedSession(state, 'workout')
+    state.active.entries[0].sets[0].w = 80
+    const saved = saveWorkoutEdit(state)
+    expect(saved.entries[0]).toMatchObject({ blockId: 'b', blockWeek: 2 })
+  })
+
   it('rebuilds best weights and PR flags after lowering record work', () => {
     const state = fixture()
     state.workouts.push({ id: 'later', d: '2026-09-02', start: 3000, end: 4000, entries: [entry(30)], prs: [] })
