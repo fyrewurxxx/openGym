@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': 'Twoje zapisane treningi zachowują swoją historię.',
   'this block': 'ten blok',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} jest na czas, a blok nie może zawierać ćwiczenia na czas.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'Poprzedni blok się skończył. Ten zaczyna się w dniu jego końca, z nowymi Training Max.',
 }

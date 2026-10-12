@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
+import { useUI } from '../store/useUI.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekStartOf, weekDayOffset, DAYS, DAYN } from '../lib/format.js'
 import { t, tn, dateLocale } from '../lib/i18n.js'
@@ -13,6 +14,7 @@ import { scheduleModeOf } from '../lib/rotation.js'
 import { activeBlockDef, blockWeekOf } from '../lib/program-block.js'
 import { useConnectionTrouble } from '../components/SyncBanner.jsx'
 import { Button } from '../components/ui.jsx'
+import { startBlockSheet } from '../components/StartBlockSheet.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 import { dayNoteOf } from '../lib/day-notes.js'
@@ -25,6 +27,14 @@ export default function Home() {
   // The banner switched off and the sync stuck: a dot on the gear (Settings → Show connection status).
   const trouble = useConnectionTrouble()
   const [weekOffset, setWeekOffset] = useState(0)
+  // A Program Block ended with another chained after it (App.jsx settled the end): the Start sheet
+  // opens for that one, once. Closed without starting it, the old schedule simply carries on.
+  const blockChain = useUI(s => s.blockChain)
+  useEffect(() => {
+    if (!blockChain) return
+    useUI.getState().setBlockChain(null)
+    startBlockSheet(blockChain.nextBlockId, blockChain.startsOn, { chained: true })
+  }, [blockChain])
 
   const today = new Date()
   // A weekday can hold several routines. `todayRoutines` is the whole day; `routine` is the

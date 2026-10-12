@@ -2348,4 +2348,5 @@ export default {
   'Your logged sessions keep their history.': 'تحتفظ جلساتك المسجّلة بسجلّها.',
   'this block': 'هذا البرنامج',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} تمرين زمني، ولا يمكن للبرنامج احتواء تمرين زمني.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'انتهت الكتلة السابقة. تبدأ هذه في تاريخ انتهائها، بقيم Training Max جديدة.',
 }

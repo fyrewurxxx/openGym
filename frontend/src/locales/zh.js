@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': '你已记录的训练会保留其记录。',
   'this block': '这个周期',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} 是计时动作，周期无法包含计时动作。',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': '上一个区块已结束。这个区块从其结束日开始,并使用新的 Training Max。',
 }

@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': '기록된 세션의 기록은 그대로 남아요.',
   'this block': '이 블록',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0}은(는) 시간 운동이라 블록에 넣을 수 없어요.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': '이전 블록이 끝났습니다. 이 블록은 그 종료일에 시작하며 새 Training Max를 사용합니다.',
 }

@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': 'Kayıtlı antrenmanlarının geçmişi korunur.',
   'this block': 'bu blok',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} süreli bir hareket ve bir blok süreli hareket içeremez.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'Önceki blok bitti. Bu blok onun bitiş tarihinde başlar, yeni Training Max değerleriyle.',
 }

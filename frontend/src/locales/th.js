@@ -2304,4 +2304,5 @@ export default {
   'Your logged sessions keep their history.': 'เซสชันที่บันทึกไว้ยังคงมีประวัติอยู่',
   'this block': 'บล็อกนี้',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} เป็นท่าจับเวลา และบล็อกไม่สามารถมีท่าจับเวลาได้',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'บล็อกก่อนหน้าสิ้นสุดแล้ว บล็อกนี้เริ่มในวันที่บล็อกนั้นสิ้นสุด พร้อม Training Max ใหม่',
 }

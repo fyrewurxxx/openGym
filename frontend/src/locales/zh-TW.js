@@ -2286,4 +2286,5 @@ export default {
   'Your logged sessions keep their history.': '你已記錄的訓練會保留其紀錄。',
   'this block': '這個週期',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} 是計時動作，週期無法包含計時動作。',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': '上一個區塊已結束。這個區塊從其結束日開始,並使用新的 Training Max。',
 }

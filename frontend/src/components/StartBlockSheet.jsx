@@ -11,7 +11,7 @@ import { Button, NumberField, Segmented } from './ui.jsx'
 // Start a Program Block: one row per exercise the block can ever need, all upfront, each with a
 // 1RM / Training Max toggle (docs/dev/PROGRAM_BLOCKS.md §7.2). 1RM mode starts from the app's
 // estimate and stores 90% of it; Training Max mode starts blank and stores the number as typed.
-function StartBlockSheet({ blockId, startsOn, close }) {
+function StartBlockSheet({ blockId, startsOn, chained, close }) {
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const block = blockOf(S, blockId)
@@ -37,6 +37,7 @@ function StartBlockSheet({ blockId, startsOn, close }) {
 
   return <>
     <h3 style={{ marginBottom: 2 }}>{t('Start {0}', block.name)}</h3>
+    {chained && <div className="muted small" style={{ marginBottom: 6 }}>{t('The last block has ended. This one starts on its end date, with fresh Training Maxes.')}</div>}
     <div className="muted small" style={{ marginBottom: 10 }}>
       {t('Set a Training Max for each lift. A lift left blank keeps its normal progression.')}
     </div>
@@ -65,6 +66,6 @@ function StartBlockSheet({ blockId, startsOn, close }) {
   </>
 }
 
-export function startBlockSheet(blockId, startsOn = todayISO()) {
-  return useUI.getState().openSheet(close => <StartBlockSheet blockId={blockId} startsOn={startsOn} close={close} />)
+export function startBlockSheet(blockId, startsOn = todayISO(), { chained = false } = {}) {
+  return useUI.getState().openSheet(close => <StartBlockSheet blockId={blockId} startsOn={startsOn} chained={chained} close={close} />)
 }

@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': 'Le tue sessioni registrate mantengono la loro cronologia.',
   'this block': 'questo blocco',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} è a tempo, e un blocco non può contenere un esercizio a tempo.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'Il blocco precedente è finito. Questo inizia alla sua data di fine, con nuovi Training Max.',
 }

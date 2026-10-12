@@ -2313,4 +2313,5 @@ export default {
   'Your logged sessions keep their history.': 'Deine protokollierten Einheiten behalten ihren Verlauf.',
   'this block': 'diesen Block',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} ist zeitbasiert, und ein Block kann keine zeitbasierte Übung enthalten.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'Der letzte Block ist zu Ende. Dieser beginnt an dessen Enddatum, mit neuen Training Max.',
 }

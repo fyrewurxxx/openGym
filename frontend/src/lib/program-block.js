@@ -9,6 +9,7 @@
 import { snapWeight, weightIncrement } from './progression.js'
 import { modeOf } from './history.js'
 import { blockWeekOf, blockOf, activeBlockDef, blockRoutineIdsOn } from './block-calendar.js'
+import { isoOf, todayISO } from './format.js'
 
 export { blockWeekOf, blockOf, activeBlockDef, blockRoutineIdsOn }
 
@@ -94,6 +95,44 @@ export function startBlock(s, blockId, tm, startsOn) {
  */
 export function stopBlock(s) {
   s.activeBlock = null
+}
+
+// ---- Lifecycle: a block ends on the calendar, and may hand off to the next one (§6) ----
+
+/** `iso` plus `n` whole days, as an ISO date (calendar arithmetic at noon, so DST never shifts it). */
+export function addDaysISO(iso, n) {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  return isoOf(d)
+}
+
+/** The first date after the block's last day: the previous block's end, and a chained block's start. */
+export const blockEndsOn = (block, activeBlock) => addDaysISO(activeBlock.startsOn, block.weeks * 7)
+
+/**
+ * Whether the running block's run is over at `today`. Read on its own, not through blockWeekOf, so
+ * a start date still ahead of today is a block that has not begun, never one that has ended.
+ */
+export function blockNeedsAdvance(S, today = todayISO()) {
+  const block = activeBlockDef(S)
+  return !!(block && S.activeBlock && today >= blockEndsOn(block, S.activeBlock))
+}
+
+/**
+ * Ends the finished block; the week or rotation underneath was never touched, so it simply reads
+ * again. With a Block Chain target, hands back { nextBlockId, startsOn } for the caller to run
+ * through the Start sheet (Training Maxes are captured afresh: nothing carries over). The chained
+ * block's clock starts on the previous block's end date, not the day the sheet is confirmed. A
+ * chained block whose whole run has already passed is dropped, and so is a missing definition.
+ * Returns null when there is nothing to hand off.
+ */
+export function advanceBlock(s, today = todayISO()) {
+  const block = activeBlockDef(s)
+  const next = block?.nextBlockId ? blockOf(s, block.nextBlockId) : null
+  const startsOn = block && s.activeBlock ? blockEndsOn(block, s.activeBlock) : null
+  s.activeBlock = null
+  if (!next || blockWeekOf(next, { startsOn }, today) == null) return null
+  return { nextBlockId: next.id, startsOn }
 }
 
 // ---- Definitions: the block editor's pure half (docs/dev/PROGRAM_BLOCKS.md §1.1, §7.3, §8) ----

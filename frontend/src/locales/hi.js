@@ -2293,4 +2293,5 @@ export default {
   'Your logged sessions keep their history.': 'आपके लॉग किए गए सेशन का इतिहास बना रहता है।',
   'this block': 'यह ब्लॉक',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} समय-आधारित है, और ब्लॉक में समय-आधारित व्यायाम नहीं रखा जा सकता।',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'पिछला ब्लॉक समाप्त हो गया है। यह उसकी समाप्ति तिथि से शुरू होता है, नए Training Max के साथ।',
 }

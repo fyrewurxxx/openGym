@@ -2372,4 +2372,5 @@ export default {
   'Your logged sessions keep their history.': 'আপনার লগ করা সেশনের ইতিহাস থেকে যাবে।',
   'this block': 'এই ব্লক',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} টাইমড ব্যায়াম, আর ব্লকে টাইমড ব্যায়াম রাখা যায় না।',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'আগের ব্লকটি শেষ হয়েছে। এটি তার শেষ তারিখ থেকে শুরু হয়, নতুন Training Max দিয়ে।',
 }

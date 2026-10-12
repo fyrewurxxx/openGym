@@ -4,8 +4,12 @@ import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { useStore } from '../store/useStore.js'
+import { useUI } from '../store/useUI.js'
 import { todayISO } from '../lib/format.js'
+import { startBlockSheet } from '../components/StartBlockSheet.jsx'
 import Home from './Home.jsx'
+
+vi.mock('../components/StartBlockSheet.jsx', () => ({ startBlockSheet: vi.fn() }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }))
 vi.mock('../sheets.jsx', () => ({
@@ -49,5 +53,25 @@ describe('Home — Program Block', () => {
     setS({ activeBlock: { blockId: 'b1', startsOn: '2020-01-06', tm: {} } })
     mount()
     expect(todayRow().textContent).not.toContain('Operator')
+  })
+
+  it('opens the Start sheet for the chained block once, clearing the pending state', () => {
+    startBlockSheet.mockClear()
+    setS()
+    useUI.setState({ blockChain: { nextBlockId: 'b2', startsOn: '2026-03-23' } })
+    mount()
+    expect(startBlockSheet).toHaveBeenCalledTimes(1)
+    expect(startBlockSheet).toHaveBeenCalledWith('b2', '2026-03-23', { chained: true })
+    expect(useUI.getState().blockChain).toBe(null)
+    act(() => root.render(<Home />))
+    expect(startBlockSheet).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens nothing when no chain is pending', () => {
+    startBlockSheet.mockClear()
+    setS()
+    useUI.setState({ blockChain: null })
+    mount()
+    expect(startBlockSheet).not.toHaveBeenCalled()
   })
 })

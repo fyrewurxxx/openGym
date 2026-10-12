@@ -2296,4 +2296,5 @@ export default {
   'Your logged sessions keep their history.': 'A naplózott edzéseid megőrzik az előzményeiket.',
   'this block': 'ez a blokk',
   '{0} is timed, and a block can’t hold a timed exercise.': '{0} időalapú, és egy blokk nem tartalmazhat időalapú gyakorlatot.',
+  'The last block has ended. This one starts on its end date, with fresh Training Maxes.': 'Az előző blokk véget ért. Ez a befejezése napján kezdődik, új Training Maxszal.',
 }

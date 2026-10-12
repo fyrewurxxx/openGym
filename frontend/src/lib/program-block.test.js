@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   blockWeekOf, blockRoutineIdsOn, blockPrescriptionFor, blockLabelOf, trainingMaxFrom1RM, trainingMaxesFrom,
-  blockExerciseIds, startBlock, stopBlock,
+  blockExerciseIds, startBlock, stopBlock, addDaysISO, blockNeedsAdvance, advanceBlock,
   newBlockDraft, blockSlotCandidates, normalizeBlock, blockProblem, saveBlock, deleteBlock, DEFAULT_WEEK,
 } from './program-block.js'
 
@@ -239,5 +239,74 @@ describe('block definitions', () => {
     expect(s.programBlocks).toEqual([])
     expect(s.activeBlock).not.toBe(null)
     expect(blockRoutineIdsOn(s, '2026-03-02')).toEqual([])
+  })
+})
+
+// A 3-week block that began Mon 2026-03-02 ends on Mon 2026-03-23 (its last day is Sun 2026-03-22).
+describe('blockNeedsAdvance', () => {
+  it('is false while a day of the run remains, true from the end date on', () => {
+    expect(blockNeedsAdvance(blockState(), '2026-03-22')).toBe(false)
+    expect(blockNeedsAdvance(blockState(), '2026-03-23')).toBe(true)
+    expect(blockNeedsAdvance(blockState(), '2026-06-01')).toBe(true)
+  })
+
+  it('is false with no block running, a missing definition, or a start still ahead', () => {
+    expect(blockNeedsAdvance(blockState({ activeBlock: null }), '2026-06-01')).toBe(false)
+    expect(blockNeedsAdvance(blockState({ programBlocks: [] }), '2026-06-01')).toBe(false)
+    expect(blockNeedsAdvance(blockState(), '2026-02-20')).toBe(false)
+  })
+})
+
+describe('advanceBlock', () => {
+  const chained = () => {
+    const S = blockState()
+    S.programBlocks[0].nextBlockId = 'c'
+    S.programBlocks.push({ id: 'c', name: 'Operator', weeks: 6, days: {}, table: {}, nextBlockId: null })
+    return S
+  }
+
+  it('ends a block with no chain target and hands nothing back', () => {
+    const S = blockState()
+    expect(advanceBlock(S, '2026-03-23')).toBe(null)
+    expect(S.activeBlock).toBe(null)
+  })
+
+  it('leaves the week, rotation and queue exactly as they were', () => {
+    const S = blockState({ week: { 1: ['a'] }, rotation: { ids: ['a', 'b'] }, queue: null, scheduleMode: 'rotation' })
+    const before = JSON.stringify({ week: S.week, rotation: S.rotation, queue: S.queue, scheduleMode: S.scheduleMode })
+    advanceBlock(S, '2026-03-23')
+    expect(JSON.stringify({ week: S.week, rotation: S.rotation, queue: S.queue, scheduleMode: S.scheduleMode })).toBe(before)
+  })
+
+  it('hands back the chained block, starting on the previous end date and not today', () => {
+    const S = chained()
+    expect(advanceBlock(S, '2026-03-26')).toEqual({ nextBlockId: 'c', startsOn: '2026-03-23' })
+    expect(S.activeBlock).toBe(null)   // the caller starts it through the Start sheet, not this function
+  })
+
+  it('drops a chained block whose whole run has already passed', () => {
+    const S = chained()
+    expect(advanceBlock(S, '2026-05-04')).toBe(null)   // 2026-03-23 + 6 weeks = 2026-05-04
+    expect(S.activeBlock).toBe(null)
+  })
+
+  it('drops a chain target whose definition is gone', () => {
+    const S = chained()
+    S.programBlocks = S.programBlocks.filter(b => b.id !== 'c')
+    expect(advanceBlock(S, '2026-03-23')).toBe(null)
+  })
+
+  it('is never what Stop block runs: stopping a chained block ignores the chain', () => {
+    const S = chained()
+    stopBlock(S)
+    expect(S.activeBlock).toBe(null)
+  })
+})
+
+describe('addDaysISO', () => {
+  it('counts calendar days across month ends and DST', () => {
+    expect(addDaysISO('2026-03-02', 21)).toBe('2026-03-23')
+    expect(addDaysISO('2026-01-30', 3)).toBe('2026-02-02')
+    expect(addDaysISO('2026-03-28', 2)).toBe('2026-03-30')
   })
 })
