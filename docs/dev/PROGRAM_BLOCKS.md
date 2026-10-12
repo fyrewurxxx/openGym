@@ -152,8 +152,9 @@ return (r ? r.ex : []).map(slot => {
 })
 ```
 
-`date` is the session's own date (default `todayISO()`), threaded in from the caller — a
-backfilled past session resolves *its* week, not today's (§3).
+`date` is `sessionDateOf(st)` (`lib/backfill.js`): the builders already receive the history
+view a session is built from, and `historyAsOf` stamps that view with `asOf` (the day it was cut
+at), so a backfilled or edited session resolves *its* week and a live one resolves today's (§3).
 
 ---
 
@@ -173,10 +174,11 @@ Everything downstream of `plan` (`applyPrescription`, warm-up re-ramp, backoff, 
 already only reads `plan.weight`/`.reps`/`.sec`/`.sets` — it does not care whether `plan` came
 from a policy or a block, so no other line in this function changes.
 
-**Date threading.** `buildSessionEntries(st, r, { date })` and `buildCombinedEntries(st,
-routineIds, { date })` take the session's date and pass it to `blockPrescriptionFor` /
-`blockWeekOf`. Backfill and edit-date paths (`sheets.backfill`, `sheets.workoutdate`) already
-know the date they are building for; they pass it. Default is `todayISO()`.
+**Date threading.** No new parameter: every builder call site already hands over the state it
+builds from, and the past-session ones (backfill, edit a saved workout, in-session rebuilds —
+all through `historyAsOf` / `sessionHistory`) hand over a view cut at the session's day.
+`historyAsOf` stamps that view with `asOf`; `sessionDateOf(st)` reads it (today when absent) and
+`blockPrescriptionFor` / `blockWeekOf` use it. Shipped by ticket 01.
 
 `routine.excludeFromProgression` wins: a `noProg` build gets no block plan (a rehab routine in
 a block stays at its own numbers, as everywhere else).

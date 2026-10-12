@@ -4,6 +4,7 @@
 import { bestWeightForEntry } from './history.js'
 import { isSideSet, syncSideAggregate } from './workout-model.js'
 import { mergeWorkoutMedia, stampWorkout } from './sync-merge.js'
+import { todayISO } from './format.js'
 
 export const workoutsOn = (S, iso) => (S.workouts || []).filter(w => w.d === iso)
 
@@ -26,7 +27,8 @@ export const backfillEnd = active => active.start + Math.max(1, active.backfill?
 // ahead of that spot is its past: earlier days, and earlier the same day. The workout it replaces
 // is not, since that one is gone once this is saved. A confirmed working weight (exWeights) dated
 // after the day is later progression as well; one with no date is kept, nothing says when it came.
-// A view for reading only: the lists are new, everything else is S's own.
+// A view for reading only: the lists are new, everything else is S's own. `asOf` is the day it
+// was cut at, so whatever builds from the view knows which day it is building for (sessionDateOf).
 // `strict` leaves out a workout started at the very same moment too: the one being edited, when
 // it predates ids and has none to leave it out by.
 export function historyAsOf(S, { d, start = 0, replaceId = null, strict = false }) {
@@ -34,8 +36,13 @@ export function historyAsOf(S, { d, start = 0, replaceId = null, strict = false 
   const filedBefore = w => (w.d || '') < d || ((w.d || '') === d && sameDayBefore(w))
   const workouts = (S.workouts || []).filter(w => filedBefore(w) && !(replaceId != null && w.id === replaceId))
   const exWeights = Object.fromEntries(Object.entries(S.exWeights || {}).filter(([, kept]) => !kept?.d || kept.d <= d))
-  return { ...S, workouts, exWeights }
+  return { ...S, workouts, exWeights, asOf: d }
 }
+
+// The day a session is built for: the day of the history view it is built from, and today for the
+// whole log (a live session). Calendar-driven prescriptions read this, so a session logged into
+// the past is planned for its own day, not for the day it was typed in.
+export const sessionDateOf = S => S?.asOf || todayISO()
 
 // The history the running session is built from and held against: as of its own day while it is
 // logged into the past, and the whole log for a live one (S itself, so that costs nothing). A

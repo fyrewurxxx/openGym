@@ -131,6 +131,14 @@ describe('buildSessionEntries', () => {
     expect(readSession({ ...entry, sets: entry.sets.map(s => ({ ...s, done: true })) }, cfg).ok).toBe(true)
   })
 
+  // The history view a past session is built from carries the day it was cut at (asOf). Nothing
+  // that decides a prescription reads it yet, so building from the view must not change a number.
+  it('builds the same entries from a history view that carries its day as from one that does not', () => {
+    const r = { id: 'r', prog: 'linear', ex: [{ id: '0025', sets: 3, reps: 5, weight: 60 }] }
+    const hist = { ...st, workouts: [{ id: 'w1', d: '2026-01-01', start: 1, entries: [{ id: '0025', sets: [{ w: 60, r: 5, done: true }, { w: 60, r: 5, done: true }, { w: 60, r: 5, done: true }] }] }] }
+    expect(buildSessionEntries({ ...hist, asOf: '2026-01-05' }, r)).toEqual(buildSessionEntries(hist, r))
+  })
+
   it('returns a bare array — no { entries, excluded } wrapper', () => {
     const r = { id: 'r', prog: 'off', ex: [{ id: '0025', sets: 3, reps: 5, weight: 60 }] }
     const out = buildSessionEntries(st, r)

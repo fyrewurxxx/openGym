@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { workoutsOn, backfillStart, backfillEnd, insertChronological, completeBackfill, markAllSetsDone, historyAsOf, sessionHistory } from './backfill.js'
+import { todayISO } from './format.js'
+import { workoutsOn, backfillStart, backfillEnd, insertChronological, completeBackfill, markAllSetsDone, historyAsOf, sessionHistory, sessionDateOf } from './backfill.js'
 
 const w = (id, d, start = 0) => ({ id, d, start })
 
@@ -157,5 +158,28 @@ describe('markAllSetsDone', () => {
     const entry = { id: 'bench', rid: 'r1', planned: { sets: 1, reps: 5 }, sg: 'sg1', target: { reps: 5 }, sets: [{ w: 60, r: 5, done: false, rir: 2 }] }
     expect(markAllSetsDone([entry])[0]).toEqual({ ...entry, sets: [{ w: 60, r: 5, done: true, rir: 2 }], topW: 60 })
     expect(markAllSetsDone(undefined)).toEqual([])
+  })
+})
+
+// The day a session is built for, read from the history view it is built from. A live build has
+// the whole log (no stamp) and is built for today; a logged-into-the-past or edited one is built
+// for its own day, so anything calendar-driven resolves that day's, not today's.
+describe('sessionDateOf', () => {
+  const list = [w('a', '2026-01-01', 10), w('b', '2026-01-05', 10)]
+
+  it('is the day a history-as-of view was cut at', () => {
+    expect(historyAsOf({ workouts: list }, { d: '2026-01-03' }).asOf).toBe('2026-01-03')
+    expect(sessionDateOf(historyAsOf({ workouts: list }, { d: '2026-01-03' }))).toBe('2026-01-03')
+  })
+
+  it('is the day of the active session for a logged or edited one, and today for a live one', () => {
+    const past = { workouts: list, exWeights: {}, active: { d: '2026-01-05', start: 50, backfill: { durationMin: 60 } } }
+    expect(sessionDateOf(sessionHistory(past))).toBe('2026-01-05')
+    const editing = { workouts: list, exWeights: {}, active: { d: '2026-01-05', start: 10, editingWorkoutId: 'b' } }
+    expect(sessionDateOf(sessionHistory(editing))).toBe('2026-01-05')
+    const live = { workouts: list, exWeights: {}, active: { d: '2026-01-10', start: 99 } }
+    expect(sessionHistory(live)).toBe(live)
+    expect(sessionDateOf(live)).toBe(todayISO())
+    expect(sessionDateOf(undefined)).toBe(todayISO())
   })
 })
