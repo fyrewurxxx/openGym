@@ -118,6 +118,20 @@ describe('completed workout boundary', () => {
     expect(b.noProg).toBe(true)
   })
 
+  it('keeps the Program Block and week an entry was built under, written only when stamped', () => {
+    const active = {
+      id: 'w', d: '2026-08-08', start: 1,
+      entries: [
+        { id: '0025', blockId: 'b', blockWeek: 3, sets: [{ done: true, w: 60, r: 8 }], target: { sets: 1, reps: 8 } },
+        { id: '0031', sets: [{ done: true, w: 10, r: 12 }], target: { sets: 1, reps: 12 } },
+      ],
+    }
+    const [a, b] = buildCompletedWorkout(active).entries
+    expect(a).toMatchObject({ blockId: 'b', blockWeek: 3 })
+    expect('blockId' in b).toBe(false)
+    expect('blockWeek' in b).toBe(false)
+  })
+
   it('keeps the plan each entry was built from, next to the target the prescription moved', () => {
     const active = {
       id: 'w', d: '2026-08-08', start: 1, routineIds: ['strength'],

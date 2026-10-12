@@ -226,6 +226,8 @@ export const useUI = create((set, get) => ({
                        // paused: held at `left`; `endsAt` means nothing until resumeRest sets it again
   work: null,          // work countdown DURING a timed set (issue #16) — { left, total, endsAt, label, overtime? }
   timerFlashId: 0,     // changing the id retriggers the theme-blink visual alert
+  blockChain: null,    // { nextBlockId, startsOn } once a Program Block ended with a chained block still
+                       // to start; Home opens the Start sheet for it, once (App.jsx, docs/dev/PROGRAM_BLOCKS.md §6.0)
 
   flashTimer() {
     if (!useStore.getState().S.timerFlash) return
@@ -240,6 +242,7 @@ export const useUI = create((set, get) => ({
   },
   closeSheet(id) { set(s => ({ sheets: s.sheets.filter(x => x.id !== id) })) },
   closeAll() { set({ sheets: [] }) },
+  setBlockChain(blockChain) { set({ blockChain }) },
 
   // A toast is 2.2 s of text. With an action (`{ action: 'Undo', onAction }`) it stays 5 s, shows
   // the action as a button at its end and holds still while a finger rests on it (pauseToast). A

@@ -984,3 +984,66 @@ describe('body measurements across devices (#82)', () => {
     expect(next.measurements[0].t).toBe(1000)
   })
 })
+
+describe('program blocks across devices (PROGRAM_BLOCKS.md §9)', () => {
+  const T = 1_800_000_000_000
+  const block = (id, over = {}) => ({ id, name: id, daysPerWeek: 3, weeks: 4, days: {}, table: {}, nextBlockId: null, ...over })
+  const doc = (over = {}) => ({ unit: 'kg', _ts: T, workouts: [], routines: [], ...over })
+  const change = (prev, wall, mut) => { const n = clone(prev); mut(n); n._ts = stampChange(prev, n, wall); return n }
+
+  it('unions definitions by id', () => {
+    const phone = doc({ programBlocks: [{ ...block('a'), _ts: T }] })
+    const desk = doc({ programBlocks: [{ ...block('b'), _ts: T }] })
+    expect(ids(mergeStates(phone, desk).programBlocks).sort()).toEqual(['a', 'b'])
+    expect(ids(mergeStates(desk, phone).programBlocks).sort()).toEqual(['a', 'b'])
+  })
+
+  it('of an id both have, the one edited last wins whichever copy is newer as a whole', () => {
+    const cur = doc({ programBlocks: [{ ...block('a', { name: 'Old' }), _ts: T }] })
+    const desk = change(cur, T + 1000, s => { s.programBlocks[0].name = 'Renamed' })
+    const phone = change(cur, T + 2000, s => { s.workouts.push({ id: 'w', d: '2026-10-01', start: T, end: T + 1 }) })
+    for (const m of [mergeStates(desk, phone), mergeStates(phone, desk)]) {
+      expect(m.programBlocks.map(b => b.name)).toEqual(['Renamed'])
+      expect(m.workouts.map(w => w.id)).toEqual(['w'])
+    }
+    const later = change(cur, T + 3000, s => { s.programBlocks[0].weeks = 8 })
+    for (const m of [mergeStates(desk, later), mergeStates(later, desk)]) {
+      expect(m.programBlocks[0]).toMatchObject({ name: 'Old', weeks: 8 })
+    }
+  })
+
+  it('a definition deleted on one device stays deleted', () => {
+    const cur = doc({ programBlocks: [{ ...block('a'), _ts: T }, { ...block('b'), _ts: T }] })
+    const desk = change(cur, T + 1000, s => { s.programBlocks = s.programBlocks.filter(b => b.id !== 'a') })
+    const phone = change(cur, T + 500, s => { s.restSec = 60 })
+    for (const m of [mergeStates(desk, phone), mergeStates(phone, desk)]) expect(ids(m.programBlocks)).toEqual(['b'])
+  })
+
+  it('the newer active block wins wholesale, Training Maxes included', () => {
+    const cur = doc({ programBlocks: [{ ...block('a'), _ts: T }] })
+    const desk = change(cur, T + 1000, s => { s.activeBlock = { blockId: 'a', startsOn: '2026-10-05', tm: { sq: 100, dl: 140 } } })
+    const phone = change(cur, T + 2000, s => { s.activeBlock = { blockId: 'a', startsOn: '2026-10-12', tm: { sq: 110 } } })
+    for (const m of [mergeStates(desk, phone), mergeStates(phone, desk)]) {
+      expect(m.activeBlock).toEqual({ blockId: 'a', startsOn: '2026-10-12', tm: { sq: 110 } })
+    }
+  })
+
+  it('a block started on one device appears on the other, and a stop is carried too', () => {
+    const cur = doc({ programBlocks: [{ ...block('a'), _ts: T }] })
+    const idle = change(cur, T + 100, s => { s.restSec = 75 })
+    const started = change(cur, T + 1000, s => { s.activeBlock = { blockId: 'a', startsOn: '2026-10-12', tm: { sq: 100 } } })
+    expect(mergeStates(idle, started).activeBlock).toEqual(started.activeBlock)
+    expect(mergeStates(started, idle).activeBlock).toEqual(started.activeBlock)
+    const stopped = change(started, T + 2000, s => { s.activeBlock = null })
+    expect(mergeStates(started, stopped).activeBlock).toBeNull()
+    expect(mergeStates(stopped, started).activeBlock).toBeNull()
+  })
+
+  it('the store stamps a saved definition with the time of the change, and only that one', () => {
+    const cur = doc({ programBlocks: [{ ...block('a'), _ts: T }, { ...block('b'), _ts: T }] })
+    const next = change(cur, T + 500, s => { s.programBlocks[1].name = 'B2' })
+    expect(next.programBlocks[0]._ts).toBe(T)
+    expect(next.programBlocks[1]._ts).toBe(next._ts)
+    expect(next.edited?.programBlocks).toBeUndefined()
+  })
+})

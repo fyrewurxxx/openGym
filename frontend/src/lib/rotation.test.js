@@ -33,6 +33,18 @@ describe('the selected mode is derived from the live queue', () => {
   })
 })
 
+describe('a running Program Block is its own mode', () => {
+  const active = { blockId: 'b', startsOn: '2026-09-07', tm: {} }
+  it('is "block" whenever a block is running, whatever the queue or the saved flag say', () => {
+    expect(scheduleModeOf(S({ activeBlock: active }))).toBe('block')
+    expect(scheduleModeOf(S({ activeBlock: active, queue: pass(['a', 'b']), scheduleMode: 'rotation' }))).toBe('block')
+  })
+  it('reads as the old mode again once the block stops', () => {
+    expect(scheduleModeOf(S({ activeBlock: null, queue: pass(['a', 'b']) }))).toBe('rotation')
+    expect(scheduleModeOf(S({ activeBlock: null }))).toBe('week')
+  })
+})
+
 describe('starting a pass from a saved rotation', () => {
   it('starts today, from the rotation ids that still exist, stamped with the rotation id', () => {
     const s = S({ rotation: { id: 'r1', sequence: ['a', 'gone', 'b', 'a'], label: 'My split' } })

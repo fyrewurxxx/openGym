@@ -26,6 +26,9 @@ import {
   scheduleModeOf, queueRecovery, rotationIds, saveRotation, startNewPass, startPass, stopPass,
   chooseRotation, chooseFixedWeek,
 } from '../lib/rotation.js'
+import { activeBlockDef, blockOf, blockWeekOf, stopBlock } from '../lib/program-block.js'
+import { startBlockSheet } from '../components/StartBlockSheet.jsx'
+import { blockEditorSheet } from '../components/BlockEditorSheet.jsx'
 
 // Plan has two views (v1.3.11): Schedule (how you train, and when) and Routines (what you
 // train). The last one you looked at comes back: a per-device convenience, never synced, so it
@@ -118,6 +121,18 @@ export function undoTakeOut({ id, at, label, snap, mark, marks }) {
   return true
 }
 
+/** Stops the running block with an Undo toast in place of a confirm: stopping only clears
+ *  S.activeBlock, so the toast puts the same instance (start date and Training Maxes) back. */
+export function stopBlockWithUndo() {
+  const snap = structuredClone(useStore.getState().S.activeBlock)
+  if (!snap) return false
+  useStore.getState().update(s => { stopBlock(s) })
+  useUI.getState().toast(t('Block stopped.'), { action: t('Undo'), onAction: () => {
+    useStore.getState().update(s => { if (!s.activeBlock) s.activeBlock = snap })
+  } })
+  return true
+}
+
 // The flash a row lands with when a swipe brought it (a duplicate, an undo): one per new value.
 let flashSeq = 0
 
@@ -162,7 +177,7 @@ export default function Plan() {
 
   return <div className="narrow plan">
     <div className="hdr">
-      <div><h1>{t('Plan')}</h1><div className="sub">{mode === 'rotation' ? t('Your routines in a loop') : t('Your weekly routine')}</div></div>
+      <div><h1>{t('Plan')}</h1><div className="sub">{mode === 'block' ? (activeBlockDef(S)?.name ?? t('Program Block')) : mode === 'rotation' ? t('Your routines in a loop') : t('Your weekly routine')}</div></div>
       <div className="hdr-actions">
         {showCoach && <Button size="sm" variant="tinted" icon="sparkles" onClick={() => nav('/coach')}>{t('Coach')}</Button>}
         <button className="iconbtn" onClick={openMenu} aria-label={t('Plan options')} title={t('Plan options')}><Icon name="share" /></button>
@@ -203,6 +218,7 @@ function Schedule({ S, update, nav, mode }) {
   // the loop itself and the weekdays stay. With nothing running there is nothing to lose.
   const setMode = v => {
     if (v === mode) return
+    if (v === 'block') { pickBlock(); return }
     if (v === 'rotation') { update(s => { chooseRotation(s) }); return }
     if (!liveQ) { update(s => { chooseFixedWeek(s) }); return }
     confirmSheet({
@@ -212,6 +228,21 @@ function Schedule({ S, update, nav, mode }) {
       onConfirm: () => update(s => { chooseFixedWeek(s) }),
     })
   }
+
+  // Program Blocks: the third way to train. Picking one opens the Start sheet (Training Max
+  // capture); the block runs until it ends or Stop block, so while one runs the control below
+  // is text, like an externally managed rotation.
+  const blocks = S.programBlocks || []
+  const pickBlock = () => {
+    if (!blocks.length) { useUI.getState().toast(t('No program blocks yet.')); return }
+    menuSheet({
+      title: t('Start a block'),
+      items: blocks.map(b => ({ icon: 'calendar', label: b.name, onClick: () => startBlockSheet(b.id) })),
+    })
+  }
+  const runningBlock = mode === 'block' ? activeBlockDef(S) : null
+  const blockWeek = runningBlock ? blockWeekOf(runningBlock, S.activeBlock, todayISO()) : null
+  const chained = runningBlock?.nextBlockId ? blockOf(S, runningBlock.nextBlockId) : null
 
   const setSeq = ids => update(s => {
     // Emptying the sequence stops the pass but stays on Rotation with an empty loop ('No rotation
@@ -276,18 +307,39 @@ function Schedule({ S, update, nav, mode }) {
   const editing = editLoop && !external
 
   return <>
-    <Section className="plan-mode" footer={mode === 'rotation'
+    <Section className="plan-mode" footer={mode === 'block'
+      ? t('The block sets your days and weights until it ends or you stop it.')
+      : mode === 'rotation'
       ? t('Routines in a loop. Whatever is next stays next until you train it, whatever the day.')
       : t('The same routines on the same weekdays, every week.')}>
       <Row icon="repeat" iconTint="var(--orange)" title={t('How you train')}>
         {/* A planner's own queue is not this app's to switch off: text, not a control. */}
-        {external
+        {mode === 'block'
+          ? <span className="small dim plan-mode-locked">{t('Program Block')}</span>
+          : external
           ? <span className="small dim plan-mode-locked">{t('Rotation')} · {t('Externally managed')}</span>
           : <Segmented className="seg-inline" value={mode} onChange={setMode}
-              options={[{ value: 'week', label: t('Fixed Week') }, { value: 'rotation', label: t('Rotation') }]} />}
+              options={[{ value: 'week', label: t('Fixed Week') }, { value: 'rotation', label: t('Rotation') }, { value: 'block', label: t('Program Block') }]} />}
       </Row>
     </Section>
 
+    {mode === 'block' && <div className="plan-block card">
+      <div className="row between" style={{ gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="ttl">{runningBlock?.name ?? t('Program Block')}</div>
+          {runningBlock && blockWeek != null && <div className="ss">{t('Week {0} of {1}', blockWeek, runningBlock.weeks)}</div>}
+          {chained && <div className="ss dim">{t('then → {0}', chained.name)}</div>}
+        </div>
+        <Button size="sm" variant="tinted" icon="xmark" aria-label={t('Stop block')} onClick={stopBlockWithUndo}>{t('Stop block')}</Button>
+      </div>
+    </div>}
+
+    {/* The definitions: made and edited here, started from "Program Block" above. */}
+    <Section className="plan-blocks" title={t('Program blocks')}>
+      {blocks.map(b => <Row key={b.id} icon="calendar" title={b.name} subtitle={t('Weeks: {0}', b.weeks)}
+        accessory="chevron" onClick={() => blockEditorSheet(b.id)} />)}
+      <Row icon="plus" title={t('New block')} onClick={() => blockEditorSheet()} />
+    </Section>
     {!S.routines.length && <div className="empty plan-empty">
       <div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Make one, or grab the starter plan to get going.')}
       <div style={{ marginTop: 12 }}><Button icon="clipboard" onClick={starterPlanSheet}>{t('Load starter plan')}</Button></div>
@@ -302,7 +354,7 @@ function Schedule({ S, update, nav, mode }) {
       </div>
     </div>}
 
-    {mode === 'week' ? <>
+    {mode === 'block' ? null : mode === 'week' ? <>
       <h4 className="sec">{t('This week')}</h4>
       <div className="list plan-week">{weekOrder(ws).map(d => dayRow(d))}</div>
       <p className="sect-f">{t('Want two routines on one day? Tap the day and pick both.')}</p>

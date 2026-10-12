@@ -23,6 +23,7 @@ const workRowsForMode = (entry = {}, mode = 'reps') => {
 // gets dragged along behind it.
 import { t } from './i18n-core.js'
 import { queueNext, pinState, queueLiveOn } from './queue.js'
+import { blockRoutineIdsOn } from './block-calendar.js'
 import { isPyramid, pyramidLabel, pyramidTargetAt, pyramidWeightAt, PYRAMID_MAX } from './pyramid.js'
 
 // When a workout happened, as epoch ms: its own recorded start, else noon on its calendar day.
@@ -475,6 +476,8 @@ export function bestWeightFor(S, exId, as) {
  * other days. Once the session is done the pin is fulfilled and the day reads as if unpinned.
  */
 export function effectiveRoutineIds(S, iso, today = todayISO()) {
+  // A running Program Block supersedes all of the below: no day override, no queue, no S.week.
+  if (S.activeBlock) return blockRoutineIdsOn(S, iso)
   const ov = S.dayPlan[iso]
   if (ov === 'rest') return []
   const pin = pinState(S, ov)

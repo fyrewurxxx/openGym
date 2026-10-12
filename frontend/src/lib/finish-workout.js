@@ -78,6 +78,9 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
       // shape it always was. Without this the whitelist drops both at finish.
       ...(entry.rid ? { rid: entry.rid } : {}),
       ...(entry.noProg === true ? { noProg: true } : {}),
+      // The Program Block and week the entry was built under (session-start.js), frozen at build
+      // time so History can say which week of the block a session was.
+      ...(entry.blockId ? { blockId: entry.blockId, blockWeek: entry.blockWeek } : {}),
       // What the routine asked for when the session was built (session-start.js), next to the
       // target the prescription moved — how the next session tells an edited plan (#275).
       ...(entry.planned ? { planned: entry.planned } : {}),

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
@@ -10,6 +10,8 @@ import { effectiveLang } from './lib/default-lang.js'
 import { setPlayOnSilent, setVibrate, setAlarmBuzzer } from './lib/sound.js'
 import { buzzAsAlarm } from './lib/rest-alert.js'
 import { setNav } from './lib/nav.js'
+import { blockNeedsAdvance, advanceBlock } from './lib/program-block.js'
+import { todayISO } from './lib/format.js'
 import { setSystemBarsLight } from './lib/system-bars.js'
 import { initBackButton } from './lib/back.js'
 import { useWakeLock } from './lib/wakelock.js'
@@ -96,6 +98,38 @@ function Shell() {
     navigate('/workout', { replace: true })
     exitWorkoutEdit(() => navigate(destination, { replace: true }))
   }, [loc.pathname, loc.search, S.active?.editingWorkoutId, navigate])
+  // A Program Block's end is a date, not something the user does, and a PWA can cold-start on any
+  // route: so it is settled here, once the saved copy is in and before any view reads the schedule
+  // (they are held back below while one is due). `today` follows the clock: it moves when the app
+  // comes back to the foreground and when midnight passes with it open.
+  const [today, setToday] = useState(todayISO)
+  useEffect(() => {
+    let tm = null
+    const sync = () => setToday(todayISO())
+    const arm = () => {
+      const now = new Date()
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1)
+      tm = setTimeout(() => { sync(); arm() }, midnight - now)
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible') sync() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', sync)
+    window.addEventListener('pageshow', sync)
+    arm()
+    return () => {
+      clearTimeout(tm)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', sync)
+      window.removeEventListener('pageshow', sync)
+    }
+  }, [])
+  const blockDue = ready && blockNeedsAdvance(S, today)
+  useEffect(() => {
+    if (!blockDue) return
+    let chain = null
+    useStore.getState().update(s => { chain = advanceBlock(s, today) })
+    useUI.getState().setBlockChain(chain)
+  }, [blockDue, today])
   // A preset key, or the user's own colour as '#rrggbb' (lib/accent.js), already checked.
   const accent = accentValue(S)
   useEffect(() => { applyPrefs(S.theme, accent) }, [S.theme, accent])
@@ -188,7 +222,7 @@ function Shell() {
   const noTabs = inWorkout || loc.pathname === '/coach' || needsMobileOnboarding
 
   const authed = user || isGuest
-  if (!ready && !authed) return (
+  if ((!ready && !authed) || blockDue) return (
     <div id="app">
       <div style={{ paddingTop: '44vh', display: 'flex', justifyContent: 'center', fontSize: 34, color: 'var(--label-3)' }}>
         <Icon name="dumbbell" />

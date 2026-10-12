@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildSessionEntries, plannedConfigOf, builtOutOfProgression } from './session-start.js'
+import { buildCombinedEntries } from './session-merge.js'
 import { readSession } from './progression.js'
 import { isWarmupRow } from './workout-model.js'
 
@@ -131,6 +132,14 @@ describe('buildSessionEntries', () => {
     expect(readSession({ ...entry, sets: entry.sets.map(s => ({ ...s, done: true })) }, cfg).ok).toBe(true)
   })
 
+  // The history view a past session is built from carries the day it was cut at (asOf). Nothing
+  // that decides a prescription reads it yet, so building from the view must not change a number.
+  it('builds the same entries from a history view that carries its day as from one that does not', () => {
+    const r = { id: 'r', prog: 'linear', ex: [{ id: '0025', sets: 3, reps: 5, weight: 60 }] }
+    const hist = { ...st, workouts: [{ id: 'w1', d: '2026-01-01', start: 1, entries: [{ id: '0025', sets: [{ w: 60, r: 5, done: true }, { w: 60, r: 5, done: true }, { w: 60, r: 5, done: true }] }] }] }
+    expect(buildSessionEntries({ ...hist, asOf: '2026-01-05' }, r)).toEqual(buildSessionEntries(hist, r))
+  })
+
   it('returns a bare array — no { entries, excluded } wrapper', () => {
     const r = { id: 'r', prog: 'off', ex: [{ id: '0025', sets: 3, reps: 5, weight: 60 }] }
     const out = buildSessionEntries(st, r)
@@ -196,5 +205,108 @@ describe('builtOutOfProgression', () => {
     expect(builtOutOfProgression({ noProg: true }, null)).toBe(false)
     expect(builtOutOfProgression({ rid: 'd' }, deload)).toBe(false)
     expect(builtOutOfProgression(null, deload)).toBe(false)
+  })
+})
+
+// A running Program Block decides the weight, sets and reps (lib/program-block.js).
+describe('buildSessionEntries — program block', () => {
+  // 3-week block from Mon 2026-03-02; squat (0025) at 70 / 80 / 90 % of a 102 kg Training Max.
+  const blockSt = (over = {}) => ({
+    unit: 'kg', workouts: [], exWeights: {}, routines: [], asOf: '2026-03-10',   // week 2
+    programBlocks: [{
+      id: 'b', name: 'Base', weeks: 3, days: {},
+      table: { '0025': { 1: { pct: 70, sets: 3, reps: 5 }, 2: { pct: 80, sets: 4, reps: 4 }, 3: { pct: 90, sets: 2, reps: 3 } } },
+    }],
+    activeBlock: { blockId: 'b', startsOn: '2026-03-02', tm: { '0025': 102 } },
+    ...over,
+  })
+  const squat = { id: '0025', sets: 3, reps: 8, weight: 60, inc: 2.5, prog: 'linear' }
+  const routine = { id: 'r', prog: 'linear', ex: [squat] }
+
+  it('opens at the week percentage of the Training Max, with the sets and reps of that week', () => {
+    const [e] = buildSessionEntries(blockSt(), routine)
+    const work = e.sets.filter(s => !isWarmupRow(s))
+    expect(e.plan.kind).toBe('block')
+    expect(work).toHaveLength(4)
+    expect(work.every(s => s.w === 82.5 && s.r === 4)).toBe(true)   // 80% of 102 = 81.6 → 82.5
+  })
+
+  it('stamps the block and week on a block-owned entry, and nothing on one built from its policy', () => {
+    const r = { id: 'r', prog: 'linear', ex: [squat, { ...squat, id: '0001' }] }   // 0001 is not in the table
+    const [owned, free] = buildSessionEntries(blockSt({ asOf: '2026-03-09' }), r)   // week 2
+    expect(owned).toMatchObject({ blockId: 'b', blockWeek: 2 })
+    expect('blockId' in free).toBe(false)
+    expect('blockWeek' in free).toBe(false)
+  })
+
+  it('freezes the week it was built for, not the one a later edit of the definition would give', () => {
+    const [e] = buildSessionEntries(blockSt({ asOf: '2026-03-09' }), routine)
+    const edited = blockSt({ asOf: '2026-03-09' })
+    edited.programBlocks[0].weeks = 10
+    expect(e.blockWeek).toBe(2)
+    expect(buildSessionEntries(edited, routine)[0].blockWeek).toBe(2)   // derived from the date, so it is the same either way
+  })
+
+  it('builds the override exercise in the slot, at its own Training Max, with the slot settings carried over', () => {
+    const st = blockSt({ asOf: '2026-03-16' })   // week 3
+    st.programBlocks[0].table['0025'][3] = { pct: 50, sets: 5, reps: 3, exerciseId: '0099' }
+    st.activeBlock.tm = { '0025': 200, '0099': 60 }
+    const r = { id: 'r', prog: 'linear', ex: [{ ...squat, sg: 'legs', warmupSets: 1 }] }
+    const entries = buildSessionEntries(st, r)
+
+    expect(entries.map(e => e.id)).toEqual(['0099'])   // no entry for the slot exercise that day
+    const [e] = entries
+    expect(e.sg).toBe('legs')
+    expect(e.target.warmupSets).toBe(1)
+    const work = e.sets.filter(s => !isWarmupRow(s))
+    expect(work).toHaveLength(5)
+    expect(work.every(s => s.w === 30 && s.r === 3)).toBe(true)   // 50% of 60, not of 200
+    expect(e.sets.filter(isWarmupRow)).toHaveLength(1)
+  })
+
+  describe('falls through to normal progression', () => {
+    // The same build with no block running is the reference: a fall-through must match it exactly.
+    const plain = (st, r = routine) => buildSessionEntries({ ...st, activeBlock: null }, r)[0]
+    const sameAsPlain = (st, r = routine) => {
+      const [e] = buildSessionEntries(st, r)
+      expect(e.plan.kind).not.toBe('block')
+      expect(e.sets).toEqual(plain(st, r).sets)
+      expect(e.target).toEqual(plain(st, r).target)
+    }
+
+    it('for an exercise the block table does not list', () => {
+      sameAsPlain(blockSt(), { id: 'r', prog: 'linear', ex: [{ ...squat, id: '0001' }] })
+    })
+    it('in a week the table has no entry for', () => {
+      const st = blockSt({ asOf: '2026-03-16' })   // week 3, the table only has weeks 1-2
+      delete st.programBlocks[0].table['0025'][3]
+      sameAsPlain(st)
+    })
+    it('when no Training Max was captured, never a weight of 0', () => {
+      const st = blockSt()
+      st.activeBlock.tm = {}
+      sameAsPlain(st)
+      expect(buildSessionEntries(st, routine)[0].target.weight).toBe(60)
+    })
+    it('for a routine excluded from progression', () => {
+      const r = { ...routine, excludeFromProgression: true }
+      const [e] = buildSessionEntries(blockSt(), r)
+      expect(e.plan.kind).toBe('off')
+      expect(e.target.weight).toBe(60)
+    })
+  })
+
+  it('a backfilled day resolves its own week, not the current one', () => {
+    // Built for Tue of week 1 (70% of 102 = 71.4 → 72.5), while the real clock is long past the block.
+    const [e] = buildSessionEntries(blockSt({ asOf: '2026-03-03' }), routine)
+    expect(e.plan).toMatchObject({ kind: 'block', week: 1, weight: 72.5, sets: 3, reps: 5 })
+  })
+
+  it('still stamps rid and returns the routine ids on a block day', () => {
+    const st = blockSt({ routines: [routine] })
+    const built = buildCombinedEntries(st, ['r'])
+    expect(built.routineIds).toEqual(['r'])
+    expect(built.entries.map(e => e.rid)).toEqual(['r'])
+    expect(built.entries[0].plan.kind).toBe('block')
   })
 })
